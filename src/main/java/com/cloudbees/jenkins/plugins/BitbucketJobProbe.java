@@ -1,12 +1,16 @@
 package com.cloudbees.jenkins.plugins;
 
+import hudson.model.FreeStyleProject;
+import hudson.model.ItemGroup;
 import hudson.model.Job;
 import hudson.plugins.git.GitSCM;
 import hudson.plugins.git.GitStatus;
 import hudson.scm.SCM;
 import hudson.security.ACL;
 
+import java.io.IOException;
 import java.net.URISyntaxException;
+import java.util.Map;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
@@ -23,10 +27,27 @@ import org.eclipse.jgit.transport.URIish;
 public class BitbucketJobProbe {
 
     public void triggerMatchingJobs(String user, String url, String scm) {
+        triggerMatchingJobs(user, url, scm, null);
+    }
+
+    public void triggerMatchingJobs(String user, String url, String scm, Map<String, String> envVars) {
         if ("git".equals(scm)) {
+
             SecurityContext old = Jenkins.getInstance().getACL().impersonate(ACL.SYSTEM);
+//
+//            try {
+//                LOGGER.info("Creating job");
+//
+//                Jenkins.getInstance().add(new FreeStyleProject((ItemGroup) Jenkins.getInstance(), "abc"), "abc");
+//            } catch (IOException e) {
+//                LOGGER.log(Level.SEVERE, e.getMessage(), e);
+//            }
+//
+//            LOGGER.info("Job Created");
+
             try {
                 URIish remote = new URIish(url);
+
                 for (Job<?,?> job : Jenkins.getInstance().getAllItems(Job.class)) {
                     BitBucketTrigger bTrigger = null;
                     LOGGER.log(Level.FINE, "Considering candidate job {0}", job.getName());
@@ -47,7 +68,10 @@ public class BitbucketJobProbe {
                         for (SCM scmTrigger : item.getSCMs()) {
                             if (match(scmTrigger, remote)) {
                                 LOGGER.log(Level.INFO, "Triggering BitBucket job {0}", job.getName());
-                                bTrigger.onPost(user);
+                                if (envVars != null)
+                                    bTrigger.onPost(user, envVars);
+                                else
+                                    bTrigger.onPost(user);
                             } else LOGGER.log(Level.FINE, "{0} SCM doesn't match remote repo {1}", new Object[]{job.getName(), remote});
                         }
                     } else

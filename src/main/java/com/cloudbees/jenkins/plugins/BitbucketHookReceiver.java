@@ -38,6 +38,7 @@ public class BitbucketHookReceiver implements UnprotectedRootAction {
      * @throws IOException
      */
     public void doIndex(StaplerRequest req) throws IOException {
+
         String body = IOUtils.toString(req.getInputStream());
         String contentType = req.getContentType();
         if (contentType != null && contentType.startsWith("application/x-www-form-urlencoded")) {
@@ -45,7 +46,7 @@ public class BitbucketHookReceiver implements UnprotectedRootAction {
         }
         if (body.startsWith("payload=")) body = body.substring(8);
 
-        LOGGER.fine("Received commit hook notification : " + body);
+        LOGGER.fine("Received commit hook notification: " + body);
         JSONObject payload = JSONObject.fromObject(body);
 
         payloadProcessor.processPayload(payload, req);

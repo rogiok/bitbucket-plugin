@@ -1,5 +1,7 @@
 package com.cloudbees.jenkins.plugins;
 
+import java.util.Enumeration;
+import java.util.HashMap;
 import java.util.logging.Logger;
 
 import javax.servlet.http.HttpServletRequest;
@@ -19,8 +21,12 @@ public class BitbucketPayloadProcessor {
     }
 
     public void processPayload(JSONObject payload, HttpServletRequest request) {
-        if ("Bitbucket-Webhooks/2.0".equals(request.getHeader("user-agent"))) {
-            if ("repo:push".equals(request.getHeader("x-event-key"))) {
+
+        System.out.println("User-Agent: " + getHeaderWithCaseInsensitive(request, "User-Agent"));
+        System.out.println("X-Event-Key: " + getHeaderWithCaseInsensitive(request, "X-Event-Key"));
+
+        if ("Bitbucket-Webhooks/2.0".equals(getHeaderWithCaseInsensitive(request, "User-Agent"))) {
+            if ("repo:push".equals(getHeaderWithCaseInsensitive(request, "X-Event-Key"))) {
                 LOGGER.info("Processing new Webhooks payload");
                 processWebhookPayload(payload);
             }
@@ -30,15 +36,32 @@ public class BitbucketPayloadProcessor {
         }
     }
 
+    private String getHeaderWithCaseInsensitive(HttpServletRequest request, String headerName) {
+
+        String value = request.getHeader(headerName);
+
+        if (value == null)
+            value = request.getHeader(headerName.toLowerCase());
+
+        return value;
+    }
+
     private void processWebhookPayload(JSONObject payload) {
         JSONObject repo = payload.getJSONObject("repository");
         LOGGER.info("Received commit hook notification for "+repo);
+
+        HashMap<String, String> envVars = new HashMap<String, String>();
 
         String user = payload.getJSONObject("actor").getString("username");
         String url = repo.getJSONObject("links").getJSONObject("html").getString("href");
         String scm = repo.has("scm") ? repo.getString("scm") : "git";
 
-        probe.triggerMatchingJobs(user, url, scm);
+        envVars.put("USER_NAME", user);
+
+        if (payload.has("push"))
+            envVars.put("BRANCH_NAME", payload.getJSONObject("push").getJSONArray("changes").getJSONObject(0).getJSONObject("new").getString("name"));
+
+        probe.triggerMatchingJobs(user, url, scm, envVars);
     }
 
 /*

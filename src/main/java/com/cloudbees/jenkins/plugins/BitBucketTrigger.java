@@ -3,10 +3,7 @@ package com.cloudbees.jenkins.plugins;
 import hudson.Extension;
 import hudson.Util;
 import hudson.console.AnnotatedLargeText;
-import hudson.model.Action;
-import hudson.model.Hudson;
-import hudson.model.Item;
-import hudson.model.Job;
+import hudson.model.*;
 import hudson.triggers.Trigger;
 import hudson.triggers.TriggerDescriptor;
 import hudson.util.SequentialExecutionQueue;
@@ -21,9 +18,7 @@ import java.io.IOException;
 import java.io.PrintStream;
 import java.nio.charset.Charset;
 import java.text.DateFormat;
-import java.util.Collection;
-import java.util.Collections;
-import java.util.Date;
+import java.util.*;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
@@ -37,11 +32,17 @@ public class BitBucketTrigger extends Trigger<Job<?, ?>> {
     public BitBucketTrigger() {
     }
 
+    public void onPost(String triggeredByUser) {
+        onPost(triggeredByUser, null);
+    }
+
     /**
      * Called when a POST is made.
      */
-    public void onPost(String triggeredByUser) {
+    public void onPost(String triggeredByUser, Map<String, String> envVars) {
         final String pushBy = triggeredByUser;
+        final Map<String, String> environmentVars = envVars;
+
         getDescriptor().queue.execute(new Runnable() {
             private boolean runPolling() {
                 try {
@@ -49,50 +50,92 @@ public class BitBucketTrigger extends Trigger<Job<?, ?>> {
                     try {
                         PrintStream logger = listener.getLogger();
                         long start = System.currentTimeMillis();
-                        logger.println("Started on "+ DateFormat.getDateTimeInstance().format(new Date()));
-                        boolean result = SCMTriggerItem.SCMTriggerItems.asSCMTriggerItem(job).poll(listener).hasChanges();
-                        logger.println("Done. Took "+ Util.getTimeSpanString(System.currentTimeMillis()-start));
-                        if(result)
+
+                        logger.println("Started on " + DateFormat.getDateTimeInstance().format(new Date()));
+//                        boolean result = SCMTriggerItem.SCMTriggerItems.asSCMTriggerItem(job).poll(listener).hasChanges();
+                        boolean result = true;
+
+                        logger.println("Done. Took " + Util.getTimeSpanString(System.currentTimeMillis() - start));
+
+                        if (result)
                             logger.println("Changes found");
                         else
                             logger.println("No changes");
                         return result;
                     } catch (Error e) {
                         e.printStackTrace(listener.error("Failed to record SCM polling"));
-                        LOGGER.log(Level.SEVERE,"Failed to record SCM polling",e);
+                        LOGGER.log(Level.SEVERE, "Failed to record SCM polling", e);
                         throw e;
                     } catch (RuntimeException e) {
                         e.printStackTrace(listener.error("Failed to record SCM polling"));
-                        LOGGER.log(Level.SEVERE,"Failed to record SCM polling",e);
+                        LOGGER.log(Level.SEVERE, "Failed to record SCM polling", e);
                         throw e;
                     } finally {
                         listener.close();
                     }
                 } catch (IOException e) {
-                    LOGGER.log(Level.SEVERE,"Failed to record SCM polling",e);
+                    LOGGER.log(Level.SEVERE, "Failed to record SCM polling", e);
                 }
                 return false;
             }
 
             public void run() {
                 if (runPolling()) {
-                    String name = " #"+job.getNextBuildNumber();
+                    String name = " #" + job.getNextBuildNumber();
                     BitBucketPushCause cause;
+
                     try {
                         cause = new BitBucketPushCause(getLogFile(), pushBy);
                     } catch (IOException e) {
-                        LOGGER.log(Level.WARNING, "Failed to parse the polling log",e);
+                        LOGGER.log(Level.WARNING, "Failed to parse the polling log", e);
                         cause = new BitBucketPushCause(pushBy);
                     }
+
+                    LOGGER.info("Putting vars");
+
+                    Iterator<String> keys = environmentVars.keySet().iterator();
+                    String key = "";
+
+                    ParametersDefinitionProperty parametersDefinitionProperty =
+                            job.getProperty(ParametersDefinitionProperty.class);
+
+                    if (parametersDefinitionProperty == null) {
+                        LOGGER.info("New property");
+                        try {
+                            parametersDefinitionProperty =
+                                    new ParametersDefinitionProperty(new ArrayList<ParameterDefinition>());
+
+                            job.addProperty(parametersDefinitionProperty);
+                        } catch (IOException e) {
+                            LOGGER.log(Level.SEVERE, e.getMessage(), e);
+                        }
+                    }
+
+                    while (keys.hasNext()) {
+                        key = keys.next();
+                        String value = environmentVars.get(key);
+
+                        LOGGER.info(key + "=" + value);
+
+                        parametersDefinitionProperty.getParameterDefinitions()
+                                .add(new StringParameterDefinition(key, value));
+                    }
+
+                    LOGGER.info("All vars");
+
                     ParameterizedJobMixIn pJob = new ParameterizedJobMixIn() {
-                        @Override protected Job asJob() {
+                        @Override
+                        protected Job asJob() {
                             return job;
                         }
                     };
+
+                    LOGGER.info("Starting");
+
                     if (pJob.scheduleBuild(cause)) {
-                        LOGGER.info("SCM changes detected in "+ job.getName()+". Triggering "+ name);
+                        LOGGER.info("SCM changes detected in " + job.getName() + ". Triggering " + name);
                     } else {
-                        LOGGER.info("SCM changes detected in "+ job.getName()+". Job is already in the queue");
+                        LOGGER.info("SCM changes detected in " + job.getName() + ". Job is already in the queue");
                     }
                 }
             }
