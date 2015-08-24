@@ -3,13 +3,17 @@ package com.cloudbees.jenkins.plugins;
 import hudson.Extension;
 import hudson.model.UnprotectedRootAction;
 
+import java.io.BufferedReader;
 import java.io.IOException;
 import java.net.URLDecoder;
+import java.util.logging.Level;
 import java.util.logging.Logger;
 
+import hudson.util.HttpResponses;
 import net.sf.json.JSONObject;
 
 import org.apache.commons.io.IOUtils;
+import org.kohsuke.stapler.HttpResponse;
 import org.kohsuke.stapler.StaplerRequest;
 
 /**
@@ -37,7 +41,7 @@ public class BitbucketHookReceiver implements UnprotectedRootAction {
      * as form-urlencoded <pre>payload=JSON</pre>
      * @throws IOException
      */
-    public void doIndex(StaplerRequest req) throws IOException {
+    public HttpResponse doIndex(StaplerRequest req) throws IOException {
 
         String body = IOUtils.toString(req.getInputStream());
         String contentType = req.getContentType();
@@ -46,10 +50,12 @@ public class BitbucketHookReceiver implements UnprotectedRootAction {
         }
         if (body.startsWith("payload=")) body = body.substring(8);
 
-        LOGGER.fine("Received commit hook notification: " + body);
-        JSONObject payload = JSONObject.fromObject(body);
+        LOGGER.log(Level.INFO, "Received commit hook notification: " + body.trim());
+        JSONObject payload = JSONObject.fromObject(body.trim());
 
         payloadProcessor.processPayload(payload, req);
+
+        return HttpResponses.ok();
     }
 
     private static final Logger LOGGER = Logger.getLogger(BitbucketHookReceiver.class.getName());

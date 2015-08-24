@@ -117,8 +117,22 @@ public class BitBucketTrigger extends Trigger<Job<?, ?>> {
 
                         LOGGER.info(key + "=" + value);
 
-                        parametersDefinitionProperty.getParameterDefinitions()
-                                .add(new StringParameterDefinition(key, value));
+                        int offset = -1;
+
+                        for (int i = 0; i < parametersDefinitionProperty.getParameterDefinitions().size(); i++) {
+                            if (parametersDefinitionProperty.getParameterDefinitions().get(i).getName().equals(key)) {
+                                offset = i;
+
+                                break;
+                            }
+                        }
+
+                        if (offset == -1)
+                            parametersDefinitionProperty.getParameterDefinitions()
+                                    .add(new StringParameterDefinition(key, value));
+                        else
+                            parametersDefinitionProperty.getParameterDefinitions()
+                                    .set(offset, new StringParameterDefinition(key, value));
                     }
 
                     LOGGER.info("All vars");
