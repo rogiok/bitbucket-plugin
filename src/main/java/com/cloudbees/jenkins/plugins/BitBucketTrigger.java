@@ -52,8 +52,8 @@ public class BitBucketTrigger extends Trigger<Job<?, ?>> {
                         long start = System.currentTimeMillis();
 
                         logger.println("Started on " + DateFormat.getDateTimeInstance().format(new Date()));
-//                        boolean result = SCMTriggerItem.SCMTriggerItems.asSCMTriggerItem(job).poll(listener).hasChanges();
-                        boolean result = true;
+                        boolean result = SCMTriggerItem.SCMTriggerItems.asSCMTriggerItem(job).poll(listener).hasChanges();
+//                        boolean result = true;
 
                         logger.println("Done. Took " + Util.getTimeSpanString(System.currentTimeMillis() - start));
 
