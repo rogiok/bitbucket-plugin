@@ -24,6 +24,7 @@ public class BitbucketPayloadProcessor {
 
         System.out.println("User-Agent: " + getHeaderWithCaseInsensitive(request, "User-Agent"));
         System.out.println("X-Event-Key: " + getHeaderWithCaseInsensitive(request, "X-Event-Key"));
+        System.out.println("JSON payload: " + payload.toString());
 
         if ("Bitbucket-Webhooks/2.0".equals(getHeaderWithCaseInsensitive(request, "User-Agent"))) {
             if ("repo:push".equals(getHeaderWithCaseInsensitive(request, "X-Event-Key"))) {
